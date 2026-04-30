@@ -179,17 +179,12 @@ Where:
 - hybrid model preserves physical adsorption trends
 - sensitivity analysis shows realistic saturation
 
-![Sensitivity concentration](figures/sensitivity_concentration.png)
+![Sensitivity concentration](figures/hybrid_sensitivity_concentration.png)
 
 - smooth increase
 - realistic saturation
 - consistent with adsorption physics
 
-![Sensitivity concentration](figures/sensitivity_concentration.png)
-
-- smooth increase
-- realistic saturation
-- consistent with adsorption physics
 ---
 
 ## 🧱 Unstructured Data Handling
