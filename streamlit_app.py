@@ -8,6 +8,16 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
+try:
+    from rdkit import Chem
+    from rdkit.Chem import Crippen, Descriptors, Lipinski, rdMolDescriptors
+except Exception:
+    Chem = None
+    Crippen = None
+    Descriptors = None
+    Lipinski = None
+    rdMolDescriptors = None
+
 
 # ============================================================
 # App configuration
@@ -56,8 +66,10 @@ WASTEWATER_TYPES = ["Synthetic", "Lake water", "Secondary effluent", "Ground wat
 ADSORPTION_TYPES = ["Single", "Competative"]  # Keep dataset spelling.
 
 
-POLLUTANT_LIBRARY: Dict[str, Dict[str, float]] = {
+POLLUTANT_LIBRARY: Dict[str, Dict[str, float | str]] = {
+    # Pharmaceuticals already used in the original app
     "IBU / IBF - Ibuprofen": {
+        "smiles": "CC(C)Cc1ccc(cc1)[C@@H](C)C(=O)O",
         "mol_weight": 206.28,
         "logp": 3.50,
         "tpsa": 37.30,
@@ -66,6 +78,7 @@ POLLUTANT_LIBRARY: Dict[str, Dict[str, float]] = {
         "num_rings": 1.0,
     },
     "CBZ - Carbamazepine": {
+        "smiles": "NC(=O)N1c2ccccc2C=Cc3ccccc31",
         "mol_weight": 236.27,
         "logp": 2.45,
         "tpsa": 46.30,
@@ -74,6 +87,7 @@ POLLUTANT_LIBRARY: Dict[str, Dict[str, float]] = {
         "num_rings": 3.0,
     },
     "DCF - Diclofenac": {
+        "smiles": "O=C(O)Cc1ccccc1Nc2c(Cl)cccc2Cl",
         "mol_weight": 296.15,
         "logp": 4.50,
         "tpsa": 49.30,
@@ -82,6 +96,7 @@ POLLUTANT_LIBRARY: Dict[str, Dict[str, float]] = {
         "num_rings": 2.0,
     },
     "EE2 - 17α-ethinylestradiol": {
+        "smiles": "C#CC1(O)CCC2C3CCC4=CC(=O)CCC4C3CCC21C",
         "mol_weight": 296.41,
         "logp": 4.15,
         "tpsa": 40.50,
@@ -90,6 +105,7 @@ POLLUTANT_LIBRARY: Dict[str, Dict[str, float]] = {
         "num_rings": 4.0,
     },
     "NPX / NXP - Naproxen": {
+        "smiles": "COc1ccc2cc(ccc2c1)[C@@H](C)C(=O)O",
         "mol_weight": 230.26,
         "logp": 3.18,
         "tpsa": 46.50,
@@ -98,6 +114,7 @@ POLLUTANT_LIBRARY: Dict[str, Dict[str, float]] = {
         "num_rings": 2.0,
     },
     "ATE - Atenolol": {
+        "smiles": "CC(C)NCC(O)COc1ccc(CC(N)=O)cc1",
         "mol_weight": 266.34,
         "logp": 0.16,
         "tpsa": 84.60,
@@ -105,7 +122,82 @@ POLLUTANT_LIBRARY: Dict[str, Dict[str, float]] = {
         "hba": 4.0,
         "num_rings": 1.0,
     },
+
+    # Additional literature pollutants / dyes for external validation
+    "MB - Methylene Blue": {
+        "smiles": "CN(C)c1ccc2nc3ccc(N(C)C)cc3[s+]c2c1.[Cl-]",
+        "mol_weight": 319.85,
+        "logp": 3.14,
+        "tpsa": 43.90,
+        "hbd": 0.0,
+        "hba": 3.0,
+        "num_rings": 3.0,
+    },
+    "MO - Methyl Orange": {
+        "smiles": "CN(C)c1ccc(N=Nc2ccc(S(=O)(=O)[O-])cc2)cc1.[Na+]",
+        "mol_weight": 327.33,
+        "logp": 3.46,
+        "tpsa": 89.40,
+        "hbd": 0.0,
+        "hba": 6.0,
+        "num_rings": 2.0,
+    },
+    "RhB - Rhodamine B": {
+        "smiles": "CCN(CC)c1ccc2c(c1)C(=O)OC3=C2C=CC(=[N+](CC)CC)C=C3.[Cl-]",
+        "mol_weight": 479.02,
+        "logp": 3.20,
+        "tpsa": 52.90,
+        "hbd": 0.0,
+        "hba": 5.0,
+        "num_rings": 4.0,
+    },
+    "CR - Congo Red": {
+        "smiles": "Nc1ccccc1N=Nc2ccc(cc2)C(=C3C=CC(=CC3)N=Nc4ccccc4N)S(=O)(=O)[O-].[Na+]",
+        "mol_weight": 696.66,
+        "logp": 5.10,
+        "tpsa": 177.00,
+        "hbd": 4.0,
+        "hba": 10.0,
+        "num_rings": 6.0,
+    },
+    "Acetaminophen / Paracetamol": {
+        "smiles": "CC(=O)Nc1ccc(O)cc1",
+        "mol_weight": 151.16,
+        "logp": 0.46,
+        "tpsa": 49.30,
+        "hbd": 2.0,
+        "hba": 2.0,
+        "num_rings": 1.0,
+    },
+    "BPA - Bisphenol A": {
+        "smiles": "CC(C)(c1ccc(O)cc1)c2ccc(O)cc2",
+        "mol_weight": 228.29,
+        "logp": 3.64,
+        "tpsa": 40.46,
+        "hbd": 2.0,
+        "hba": 2.0,
+        "num_rings": 2.0,
+    },
+    "SMX - Sulfamethoxazole": {
+        "smiles": "Cc1cc(NS(=O)(=O)c2ccc(N)cc2)no1",
+        "mol_weight": 253.28,
+        "logp": 0.89,
+        "tpsa": 98.22,
+        "hbd": 2.0,
+        "hba": 6.0,
+        "num_rings": 2.0,
+    },
+    "CIP - Ciprofloxacin": {
+        "smiles": "O=C(O)c1cn(C2CC2)c2cc(N3CCNCC3)c(F)cc2c1=O",
+        "mol_weight": 331.35,
+        "logp": 0.28,
+        "tpsa": 74.57,
+        "hbd": 2.0,
+        "hba": 6.0,
+        "num_rings": 4.0,
+    },
     "Manual molecular descriptors": {
+        "smiles": "",
         "mol_weight": 206.28,
         "logp": 3.50,
         "tpsa": 37.30,
@@ -114,6 +206,7 @@ POLLUTANT_LIBRARY: Dict[str, Dict[str, float]] = {
         "num_rings": 1.0,
     },
 }
+
 
 
 # ============================================================
@@ -162,6 +255,37 @@ def mid(col: str, fallback_min: float, fallback_max: float) -> float:
 def clipped(value: float, col: str, fallback_min: float, fallback_max: float) -> float:
     a, b = rng(col, fallback_min, fallback_max)
     return min(max(float(value), a), b)
+
+
+def descriptors_from_smiles(smiles: str) -> Dict[str, float]:
+    """Calculate app molecular descriptors from a SMILES string using RDKit."""
+    if Chem is None:
+        raise RuntimeError(
+            "RDKit is not installed, so descriptors cannot be calculated from SMILES. "
+            "Install RDKit or use preset/manual descriptors."
+        )
+
+    mol = Chem.MolFromSmiles(smiles.strip())
+    if mol is None:
+        raise ValueError("Invalid SMILES string. Please check the chemical structure input.")
+
+    return {
+        "mol_weight": float(Descriptors.MolWt(mol)),
+        "logp": float(Crippen.MolLogP(mol)),
+        "tpsa": float(rdMolDescriptors.CalcTPSA(mol)),
+        "hbd": float(Lipinski.NumHDonors(mol)),
+        "hba": float(Lipinski.NumHAcceptors(mol)),
+        "num_rings": float(rdMolDescriptors.CalcNumRings(mol)),
+    }
+
+
+def descriptor_source_note(source: str, smiles: str | None = None) -> None:
+    if source == "preset":
+        st.sidebar.caption("Descriptors are calculated from the preset SMILES when RDKit is available; stored fallback values are used otherwise.")
+    elif source == "smiles":
+        st.sidebar.caption("Descriptors are calculated directly from the SMILES string using RDKit.")
+    else:
+        st.sidebar.caption("Manual mode lets you test pollutants not available as presets or SMILES.")
 
 
 def add_wastewater_dummies(input_data: Dict[str, float], wastewater_type: str) -> Dict[str, float]:
@@ -329,9 +453,64 @@ st.info(
 # Sidebar inputs
 # ============================================================
 st.sidebar.header("Pollutant")
-pollutant = st.sidebar.selectbox("Pollutant / descriptor preset", list(POLLUTANT_LIBRARY.keys()))
-desc = POLLUTANT_LIBRARY[pollutant]
-manual = pollutant == "Manual molecular descriptors"
+descriptor_mode = st.sidebar.radio(
+    "How do you want to define the pollutant?",
+    ["Preset pollutant", "Enter SMILES", "Manual descriptors"],
+    horizontal=False,
+)
+
+if descriptor_mode == "Preset pollutant":
+    preset_names = [name for name in POLLUTANT_LIBRARY if name != "Manual molecular descriptors"]
+    pollutant = st.sidebar.selectbox("Pollutant / dye preset", preset_names)
+    preset = POLLUTANT_LIBRARY[pollutant]
+    preset_smiles = str(preset.get("smiles", ""))
+
+    if preset_smiles and Chem is not None:
+        try:
+            desc = POLLUTANT_LIBRARY[pollutant].copy()
+        except Exception:
+            desc = {k: float(preset[k]) for k in ["mol_weight", "logp", "tpsa", "hbd", "hba", "num_rings"]}
+            st.sidebar.warning("Could not calculate descriptors from preset SMILES; using stored fallback values.")
+    else:
+        desc = {k: float(preset[k]) for k in ["mol_weight", "logp", "tpsa", "hbd", "hba", "num_rings"]}
+
+    descriptor_source_note("preset", preset_smiles)
+    if preset_smiles:
+        with st.sidebar.expander("Show preset SMILES"):
+            st.code(preset_smiles, language="text")
+    manual = False
+
+elif descriptor_mode == "Enter SMILES":
+    pollutant = "Custom SMILES pollutant"
+    custom_smiles = st.sidebar.text_input(
+        "SMILES",
+        value="CC(=O)Nc1ccc(O)cc1",
+        help="Enter a valid SMILES string. RDKit will calculate molecular descriptors automatically.",
+    )
+    descriptor_source_note("smiles", custom_smiles)
+
+    try:
+        desc = descriptors_from_smiles(custom_smiles)
+        st.sidebar.success(
+            "Descriptors calculated from SMILES using RDKit."
+        )
+
+        st.sidebar.caption(
+            "Calculated descriptor values may differ slightly from "
+            "stored or literature values depending on molecular form "
+            "(e.g., salt/protonation state) and descriptor method."
+        )
+    except Exception as exc:
+        st.sidebar.error(str(exc))
+        desc = {k: float(POLLUTANT_LIBRARY["Manual molecular descriptors"][k]) for k in ["mol_weight", "logp", "tpsa", "hbd", "hba", "num_rings"]}
+
+    manual = False
+
+else:
+    pollutant = "Manual molecular descriptors"
+    desc = {k: float(POLLUTANT_LIBRARY[pollutant][k]) for k in ["mol_weight", "logp", "tpsa", "hbd", "hba", "num_rings"]}
+    descriptor_source_note("manual")
+    manual = True
 
 st.sidebar.header("Input conditions")
 
@@ -432,12 +611,18 @@ ash = st.sidebar.number_input("Ash (%)", min_value=rng("Ash", 5.6, 24.9)[0], max
 st.sidebar.header("Pollutant molecular descriptors")
 mol_weight = st.sidebar.number_input(
     "Molecular weight (g/mol)",
-    min_value=rng("mol_weight", 0.0, 500.0)[0],
-    max_value=rng("mol_weight", 0.0, 500.0)[1],
-    value=clipped(desc["mol_weight"], "mol_weight", 0.0, 500.0),
+    min_value=0.0,
+    max_value=1000.0,
+    value=clipped(desc["mol_weight"], "mol_weight", 0.0, 1000.0),
     step=1.0,
     disabled=not manual,
 )
+if mol_weight > rng("mol_weight", 0.0, 1000.0)[1]:
+    st.warning(
+        f"Molecular weight is outside the training range "
+        f"[{rng('mol_weight', 0.0, 1000.0)[0]:.1f}, {rng('mol_weight', 0.0, 1000.0)[1]:.1f}]. "
+        "Prediction may be less reliable."
+    )
 
 logp = st.sidebar.number_input(
     "logP",
@@ -539,7 +724,8 @@ input_data = add_wastewater_dummies(input_data, wastewater_type)
 st.subheader("Prediction")
 st.caption(
     "Click the button after changing inputs. The app restricts inputs to the saved training range "
-    "and uses a hybrid ML + Langmuir model for physically consistent capacity estimates."
+    "and uses a hybrid ML + Langmuir model for physically consistent capacity estimates. "
+    "Pollutant descriptors can come from presets, SMILES, or manual input."
 )
 
 if st.button("Get prediction", type="primary"):
